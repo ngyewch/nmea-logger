@@ -1,0 +1,41 @@
+version: 2
+project_name: nmea-logger
+before:
+  hooks:
+    - go mod download
+    - go mod tidy
+    - go generate ./...
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ if index .Env "VERSION" }}{{ .Env.VERSION }}{{ else }}{{ .Version }}{{ end }}
+archives:
+  - formats:
+      - zip
+nfpms:
+  - file_name_template: '{{ .PackageName }}_{{ if index .Env "VERSION" }}{{ .Env.VERSION }}{{ else }}{{ .Version }}{{ end }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    maintainer: Nick Ng <ngyewch@gmail.com>
+    description: NMEA logger
+    formats:
+      - deb
+      - rpm
+    contents:
+      - src: nfpm/contents
+        dst: /
+        type: tree
+    scripts:
+      preinstall: nfpm/scripts/preinstall.sh
+      postinstall: nfpm/scripts/postinstall.sh
+checksum:
+  name_template: 'checksums.txt'
+changelog:
+  disable: true
+release:
+  disable: false
