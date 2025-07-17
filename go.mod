@@ -1,6 +1,6 @@
 module github.com/ngyewch/nmea-logger
 
-go 1.24.5
+go 1.22
 
 require (
 	github.com/arthurkiller/rollingwriter v1.1.3
