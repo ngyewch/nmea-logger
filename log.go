@@ -9,10 +9,11 @@ import (
 	"go.bug.st/serial"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
-func doMain(ctx context.Context, cmd *cli.Command) error {
+func doLog(ctx context.Context, cmd *cli.Command) error {
 	outputDir := cmd.String(outputDirFlag.Name)
 	serialPort := cmd.String(serialPortFlag.Name)
 	baudRate := cmd.Int(baudRateFlag.Name)
@@ -72,6 +73,9 @@ func doMain(ctx context.Context, cmd *cli.Command) error {
 
 	scanner := bufio.NewScanner(port)
 	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) == "" {
+			continue
+		}
 		record := &Record{
 			Timestamp: time.Now().UnixMilli(),
 			NMEA:      scanner.Text(),

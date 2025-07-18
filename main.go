@@ -83,14 +83,29 @@ var (
 		Name:    "nmea-logger",
 		Usage:   "NMEA logger",
 		Version: version,
-		Action:  doMain,
+		Commands: []*cli.Command{
+			{
+				Name:   "log",
+				Usage:  "log",
+				Action: doLog,
+				Flags: []cli.Flag{
+					serialPortFlag,
+					baudRateFlag,
+					dataBitsFlag,
+					parityFlag,
+					stopBitsFlag,
+					outputDirFlag,
+				},
+			},
+			{
+				Name:      "ais",
+				Usage:     "ais",
+				ArgsUsage: "(log file)",
+				Action:    doAis,
+			},
+		},
+		DefaultCommand: "log",
 		Flags: []cli.Flag{
-			serialPortFlag,
-			baudRateFlag,
-			dataBitsFlag,
-			parityFlag,
-			stopBitsFlag,
-			outputDirFlag,
 			logLevelFlag,
 		},
 	}
