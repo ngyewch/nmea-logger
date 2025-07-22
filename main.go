@@ -102,6 +102,14 @@ var (
 				Usage:     "ais",
 				ArgsUsage: "(log file)",
 				Action:    doAis,
+				Commands: []*cli.Command{
+					{
+						Name:      "view",
+						Usage:     "view",
+						ArgsUsage: "(log file)",
+						Action:    doAisView,
+					},
+				},
 			},
 		},
 		DefaultCommand: "log",

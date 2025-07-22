@@ -16,6 +16,11 @@ tasks:
     cmds:
       - goreleaser release --clean
 
+  generate-ui:
+    cmds:
+      - cd ui && mise exec -- task build
+      - rm -rf resources/gen/ui && mkdir -p resources/gen/ui && cp -r ui/dist/* resources/gen/ui/
+
   dependencyUpdates:
     desc: Show dependency updates
     cmds:
