@@ -14,10 +14,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: mise install
+        uses: jdx/mise-action@v2
         with:
-          go-version: "~1.24"
+          version: 2025.7.18
+          install: true
+          cache: true
+          experimental: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: mise install
+        uses: jdx/mise-action@v2
+        with:
+          version: 2025.7.18
+          install: true
+          cache: true
+          experimental: true
+          working_directory: ui
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run GoReleaser (release)
         uses: goreleaser/goreleaser-action@v6
