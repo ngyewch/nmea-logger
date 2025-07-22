@@ -1,8 +1,6 @@
 [Unit]
 Description=nmea-logger service
 After=basic.target
-#StartLimitIntervalSec=30
-#StartLimitBurst=3
 
 [Service]
 User=nmea-logger
@@ -11,22 +9,6 @@ Restart=on-failure
 RestartSec=30
 EnvironmentFile=-/etc/nmea-logger.env
 ExecStart=/usr/bin/nmea-logger log
-ExecReload=/bin/kill -HUP $MAINPID
-LimitNOFILE=65535
-NoNewPrivileges=true
-ProtectHome=true
-ProtectSystem=full
-#ProtectHostname=true
-#ProtectControlGroups=true
-#ProtectKernelModules=true
-#ProtectKernelTunables=true
-#LockPersonality=true
-#RestrictRealtime=yes
-#RestrictNamespaces=yes
-#MemoryDenyWriteExecute=yes
-PrivateDevices=yes
-PrivateTmp=true
-CapabilityBoundingSet=
 
 [Install]
 WantedBy=multi-user.target
