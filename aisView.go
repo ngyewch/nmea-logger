@@ -9,11 +9,15 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/BertoldVdb/go-ais"
 	"github.com/BertoldVdb/go-ais/aisnmea"
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 	"github.com/ngyewch/nmea-logger/resources"
 	"github.com/urfave/cli/v3"
 )
@@ -108,9 +112,47 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			slog.Warn("error accepting websocket",
+				slog.Any("err", err),
+			)
+			return
+		}
+		defer func(c *websocket.Conn) {
+			err = c.CloseNow()
+			if err != nil {
+				slog.Warn("error closing websocket",
+					slog.Any("err", err),
+				)
+			}
+		}(c)
+
+		// Set the context as needed. Use of r.Context() is not recommended
+		// to avoid surprising behavior (see http.Hijacker).
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
+		var v any
+		err = wsjson.Read(ctx, c, &v)
+		if err != nil {
+			// ...
+		}
+
+		err = c.Close(websocket.StatusNormalClosure, "")
+		if err != nil {
+			slog.Warn("error closing websocket",
+				slog.Any("err", err),
+			)
+		}
+	})
 	http.HandleFunc("/index.html", serveIndex)
 	http.HandleFunc("/", serveIndex)
 
 	fmt.Printf("Listening on %s\n", listenAddr)
 	return http.ListenAndServe(listenAddr, nil)
+}
+
+type AisDataPlayback struct {
 }
