@@ -6,17 +6,25 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/BertoldVdb/go-ais"
-	"github.com/BertoldVdb/go-ais/aisnmea"
-	"github.com/ngyewch/nmea-logger/resources"
-	"github.com/urfave/cli/v3"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"net/http"
 	"os"
+
+	"github.com/BertoldVdb/go-ais"
+	"github.com/BertoldVdb/go-ais/aisnmea"
+	"github.com/ngyewch/nmea-logger/resources"
+	"github.com/urfave/cli/v3"
 )
 
 func doAisView(ctx context.Context, cmd *cli.Command) error {
+	if cmd.NArg() != 1 {
+		return fmt.Errorf("insufficient arguments")
+	}
+
+	listenAddr := cmd.String(listenAddrFlag.Name)
+
 	uiFs, err := fs.Sub(resources.UIFs, "gen/ui")
 	if err != nil {
 		return err
@@ -103,5 +111,6 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 	http.HandleFunc("/index.html", serveIndex)
 	http.HandleFunc("/", serveIndex)
 
-	return http.ListenAndServe(":8080", nil)
+	fmt.Printf("Listening on %s\n", listenAddr)
+	return http.ListenAndServe(listenAddr, nil)
 }

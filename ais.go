@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
+
 	"github.com/BertoldVdb/go-ais"
 	"github.com/BertoldVdb/go-ais/aisnmea"
 	"github.com/urfave/cli/v3"
-	"os"
 )
 
 const (
@@ -16,6 +18,10 @@ const (
 )
 
 func doAis(ctx context.Context, cmd *cli.Command) error {
+	if cmd.NArg() != 1 {
+		return fmt.Errorf("insufficient arguments")
+	}
+
 	logFile := cmd.Args().First()
 
 	f, err := os.Open(logFile)

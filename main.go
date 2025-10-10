@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	slogUtils "github.com/ngyewch/go-clibase/slog-utils"
-	"github.com/urfave/cli/v3"
 	"log/slog"
 	"os"
+
+	slogUtils "github.com/ngyewch/go-clibase/slog-utils"
+	"github.com/urfave/cli/v3"
 )
 
 var (
@@ -32,29 +33,34 @@ var (
 		Value:   "./logs",
 		Sources: cli.EnvVars("OUTPUT_DIR"),
 	}
+
 	serialPortFlag = &cli.StringFlag{
 		Name:     "serial-port",
 		Usage:    "serial port",
+		Category: "Serial port",
 		Required: true,
 		Sources:  cli.EnvVars("SERIAL_PORT"),
 	}
 	baudRateFlag = &cli.IntFlag{
 		Name:     "baud-rate",
 		Usage:    "baud rate",
+		Category: "Serial port",
 		Required: true,
 		Sources:  cli.EnvVars("BAUD_RATE"),
 	}
 	dataBitsFlag = &cli.IntFlag{
-		Name:    "data-bits",
-		Usage:   "data bits",
-		Value:   8,
-		Sources: cli.EnvVars("DATA_BITS"),
+		Name:     "data-bits",
+		Usage:    "data bits",
+		Category: "Serial port",
+		Value:    8,
+		Sources:  cli.EnvVars("DATA_BITS"),
 	}
 	parityFlag = &cli.StringFlag{
-		Name:    "parity",
-		Usage:   "parity",
-		Value:   "N",
-		Sources: cli.EnvVars("PARITY"),
+		Name:     "parity",
+		Usage:    "parity",
+		Category: "Serial port",
+		Value:    "N",
+		Sources:  cli.EnvVars("PARITY"),
 		Action: func(ctx context.Context, cmd *cli.Command, s string) error {
 			switch s {
 			case "N", "O", "E", "M", "S":
@@ -65,10 +71,11 @@ var (
 		},
 	}
 	stopBitsFlag = &cli.StringFlag{
-		Name:    "stop-bits",
-		Usage:   "stop bits",
-		Value:   "1",
-		Sources: cli.EnvVars("STOP_BITS"),
+		Name:     "stop-bits",
+		Usage:    "stop bits",
+		Category: "Serial port",
+		Value:    "1",
+		Sources:  cli.EnvVars("STOP_BITS"),
 		Action: func(ctx context.Context, cmd *cli.Command, s string) error {
 			switch s {
 			case "1", "1.5", "2":
@@ -77,6 +84,13 @@ var (
 			}
 			return nil
 		},
+	}
+
+	listenAddrFlag = &cli.StringFlag{
+		Name:    "listen-addr",
+		Usage:   "listen address",
+		Value:   ":8080",
+		Sources: cli.EnvVars("LISTEN_ADDR"),
 	}
 
 	app = &cli.Command{
@@ -108,6 +122,9 @@ var (
 						Usage:     "view",
 						ArgsUsage: "(log file)",
 						Action:    doAisView,
+						Flags: []cli.Flag{
+							listenAddrFlag,
+						},
 					},
 				},
 			},
