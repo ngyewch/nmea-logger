@@ -1,8 +1,9 @@
 <script lang="ts">
     import {onMount} from 'svelte';
-    import {Control, LatLng, type LatLngExpression, Map as LeafletMap, Polyline, TileLayer} from 'leaflet';
+    import {Control, Map as LeafletMap, TileLayer} from 'leaflet';
     import {AISTrackSymbol, type PositionReport, type ShipStaticData} from '@arl/leaflet-tracksymbol2';
     import {type AISRecord} from './types.js';
+    import {CustomControl} from './customControl.js';
 
     const openStreetMapTileLayer = new TileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         minZoom: 0,
@@ -73,12 +74,22 @@
         };
         new Control.Scale(scaleOptions).addTo(map);
 
+        const customControl = new CustomControl({
+            position: 'bottomright',
+        });
+        customControl.addTo(map);
+        let t: number = 0;
+
         const ws = new WebSocket(wsUrl);
         ws.onopen = () => {
             console.log("WebSocket connection opened.");
         };
         ws.onmessage = (event) => {
             const record = JSON.parse(event.data) as AISRecord;
+            if (record.t > t) {
+                customControl.setText(new Date(t).toISOString());
+                t = record.t;
+            }
             switch (record.type) {
                 case 'positionReport':
                     const positionReport0 = record.positionReport;

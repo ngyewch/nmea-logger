@@ -7,3 +7,8 @@ div#map {
   margin: 0;
   padding: 0;
 }
+
+.leaflet-custom-control {
+    padding: 0.5em;
+    background-color: white;
+}
