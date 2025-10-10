@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/BertoldVdb/go-ais"
 	"github.com/BertoldVdb/go-ais/aisnmea"
@@ -27,6 +28,7 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	listenAddr := cmd.String(listenAddrFlag.Name)
+	timeDilation := cmd.Float32(timeDilationFlag.Name)
 
 	uiFs, err := fs.Sub(resources.UIFs, "gen/ui")
 	if err != nil {
@@ -108,6 +110,7 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 		nmeaCodec := aisnmea.NMEACodecNew(aisCodec)
 
 		scanner := bufio.NewScanner(f)
+		var t int64 = 0
 		for scanner.Scan() {
 			logLineBytes := scanner.Bytes()
 
@@ -132,6 +135,13 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 			}
 
 			if decoded != nil {
+				if (t != 0) && (record.Timestamp > t) {
+					dt := float32(record.Timestamp-t) / timeDilation
+					<-time.After(time.Duration(dt) * time.Millisecond)
+					t = record.Timestamp
+				}
+
+				closed := false
 				switch packet := decoded.Packet.(type) {
 				case ais.PositionReport:
 					record := PositionReportRecord{
@@ -141,6 +151,10 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 					}
 					err = wsjson.Write(context.Background(), c, record)
 					if err != nil {
+						var closeError *websocket.CloseError
+						if errors.Is(err, closeError) {
+							closed = true
+						}
 						slog.Warn("error writing message",
 							slog.Any("err", err),
 						)
@@ -153,10 +167,18 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 					}
 					err = wsjson.Write(context.Background(), c, record)
 					if err != nil {
+						var closeError *websocket.CloseError
+						if errors.Is(err, closeError) {
+							closed = true
+						}
 						slog.Warn("error writing message",
 							slog.Any("err", err),
 						)
 					}
+				}
+
+				if closed {
+					break
 				}
 			}
 		}

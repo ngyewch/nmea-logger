@@ -92,6 +92,12 @@ var (
 		Value:   ":8080",
 		Sources: cli.EnvVars("LISTEN_ADDR"),
 	}
+	timeDilationFlag = &cli.Float32Flag{
+		Name:    "time-dilation",
+		Usage:   "time dilation",
+		Value:   60,
+		Sources: cli.EnvVars("TIME_DILATION"),
+	}
 
 	app = &cli.Command{
 		Name:    "nmea-logger",
@@ -124,6 +130,7 @@ var (
 						Action:    doAisView,
 						Flags: []cli.Flag{
 							listenAddrFlag,
+							timeDilationFlag,
 						},
 					},
 				},
