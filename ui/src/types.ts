@@ -1,9 +1,19 @@
-export interface NMEALoggerData {
-    shipStaticDataMap: Record<string, ShipStaticData>;
-    positionReportsMap: Record<string, PositionReportEntry[]>;
+export type AISRecord = PositionReportRecord | ShipStaticDataRecord;
+
+export interface PositionReportRecord {
+    type: 'positionReport';
+    t: number;
+    positionReport: PositionReport;
+}
+
+export interface ShipStaticDataRecord {
+    type: 'shipStaticData';
+    t: number;
+    shipStaticData: ShipStaticData;
 }
 
 export interface ShipStaticData {
+    UserID: number;
     ImoNumber: number;
     CallSign: string;
     Name: string;
@@ -31,12 +41,8 @@ export interface ETA {
     Minute: number;
 }
 
-export interface PositionReportEntry {
-    t: number;
-    positionReport: PositionReport;
-}
-
 export interface PositionReport {
+    UserID: number;
     NavigationalStatus: number;
     RateOfTurn: number;
     Sog: number;

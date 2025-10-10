@@ -16,6 +16,17 @@ tasks:
     cmds:
       - goreleaser release --clean
 
+  build-single-target:
+    desc: Build single target
+    cmds:
+      - goreleaser build --snapshot --single-target  --clean --output dist/nmea-logger
+
+  run-ais-view:
+    desc: Run AIS view
+    deps: [ build-single-target ]
+    cmds:
+      - dist/nmea-logger ais view ${INPUT_FILE}
+
   generate-ui:
     cmds:
       - cd ui && mise exec -- task build

@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/BertoldVdb/go-ais"
 	"github.com/BertoldVdb/go-ais/aisnmea"
@@ -44,68 +43,28 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	logFile := cmd.Args().First()
-
-	f, err := os.Open(logFile)
+	_, err = os.Stat(logFile)
 	if err != nil {
 		return err
 	}
-	defer func(f *os.File) {
-		_ = f.Close()
-	}(f)
 
-	aisCodec := ais.CodecNew(false, false)
-	aisCodec.DropSpace = true
-	nmeaCodec := aisnmea.NMEACodecNew(aisCodec)
-
-	type PositionReportEntry struct {
+	type PositionReportRecord struct {
+		Type           string             `json:"type"`
 		T              int64              `json:"t"`
 		PositionReport ais.PositionReport `json:"positionReport"`
 	}
 
-	type TemplateData struct {
-		ShipStaticDataMap  map[uint32]ais.ShipStaticData    `json:"shipStaticDataMap"`
-		PositionReportsMap map[uint32][]PositionReportEntry `json:"positionReportsMap"`
-	}
-
-	templateData := &TemplateData{
-		ShipStaticDataMap:  make(map[uint32]ais.ShipStaticData),
-		PositionReportsMap: make(map[uint32][]PositionReportEntry),
-	}
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		logLineBytes := scanner.Bytes()
-
-		jsonDecoder := json.NewDecoder(bytes.NewReader(logLineBytes))
-		jsonDecoder.DisallowUnknownFields()
-
-		var record Record
-		err = jsonDecoder.Decode(&record)
-		if err != nil {
-			return err
-		}
-
-		decoded, _ := nmeaCodec.ParseSentence(record.NMEA)
-		if decoded != nil {
-			switch packet := decoded.Packet.(type) {
-			case ais.PositionReport:
-				positionReports := templateData.PositionReportsMap[packet.UserID]
-				positionReports = append(positionReports, PositionReportEntry{
-					T:              record.Timestamp,
-					PositionReport: packet,
-				})
-				templateData.PositionReportsMap[packet.UserID] = positionReports
-			case ais.ShipStaticData:
-				templateData.ShipStaticDataMap[packet.UserID] = packet
-			}
-		}
+	type ShipStaticDataRecord struct {
+		Type           string             `json:"type"`
+		T              int64              `json:"t"`
+		ShipStaticData ais.ShipStaticData `json:"shipStaticData"`
 	}
 
 	httpUIFs := http.FileServer(http.FS(uiFs))
 	http.Handle("/assets/", httpUIFs)
 
 	serveIndex := func(w http.ResponseWriter, r *http.Request) {
-		err = tmpl.Execute(w, templateData)
+		err = tmpl.Execute(w, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -113,7 +72,11 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		c, err := websocket.Accept(w, r, nil)
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+			OriginPatterns: []string{
+				"localhost:8080",
+			},
+		})
 		if err != nil {
 			slog.Warn("error accepting websocket",
 				slog.Any("err", err),
@@ -129,15 +92,73 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 			}
 		}(c)
 
-		// Set the context as needed. Use of r.Context() is not recommended
-		// to avoid surprising behavior (see http.Hijacker).
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-
-		var v any
-		err = wsjson.Read(ctx, c, &v)
+		f, err := os.Open(logFile)
 		if err != nil {
-			// ...
+			slog.Warn("error opening log file",
+				slog.Any("err", err),
+			)
+			return
+		}
+		defer func(f *os.File) {
+			_ = f.Close()
+		}(f)
+
+		aisCodec := ais.CodecNew(false, false)
+		aisCodec.DropSpace = true
+		nmeaCodec := aisnmea.NMEACodecNew(aisCodec)
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			logLineBytes := scanner.Bytes()
+
+			jsonDecoder := json.NewDecoder(bytes.NewReader(logLineBytes))
+			jsonDecoder.DisallowUnknownFields()
+
+			var record Record
+			err = jsonDecoder.Decode(&record)
+			if err != nil {
+				slog.Warn("error reading log line",
+					slog.Any("err", err),
+				)
+				continue
+			}
+
+			decoded, err := nmeaCodec.ParseSentence(record.NMEA)
+			if err != nil {
+				slog.Warn("error parsing NMEA sentence",
+					slog.Any("err", err),
+				)
+				continue
+			}
+
+			if decoded != nil {
+				switch packet := decoded.Packet.(type) {
+				case ais.PositionReport:
+					record := PositionReportRecord{
+						Type:           "positionReport",
+						T:              record.Timestamp,
+						PositionReport: packet,
+					}
+					err = wsjson.Write(context.Background(), c, record)
+					if err != nil {
+						slog.Warn("error writing message",
+							slog.Any("err", err),
+						)
+					}
+				case ais.ShipStaticData:
+					record := ShipStaticDataRecord{
+						Type:           "shipStaticData",
+						T:              record.Timestamp,
+						ShipStaticData: packet,
+					}
+					err = wsjson.Write(context.Background(), c, record)
+					if err != nil {
+						slog.Warn("error writing message",
+							slog.Any("err", err),
+						)
+					}
+				}
+			}
 		}
 
 		err = c.Close(websocket.StatusNormalClosure, "")
@@ -152,7 +173,4 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 
 	fmt.Printf("Listening on %s\n", listenAddr)
 	return http.ListenAndServe(listenAddr, nil)
-}
-
-type AisDataPlayback struct {
 }
