@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	slogUtils "github.com/ngyewch/go-clibase/slog-utils"
 	"github.com/urfave/cli/v3"
@@ -92,11 +93,17 @@ var (
 		Value:   ":8080",
 		Sources: cli.EnvVars("LISTEN_ADDR"),
 	}
-	playbackSpeedFlag = &cli.Float32Flag{
+	playbackSpeedFlag = &cli.Float64Flag{
 		Name:    "playback-speed",
 		Usage:   "playback speed",
 		Value:   60,
 		Sources: cli.EnvVars("PLAYBACK_SPEED"),
+	}
+	playbackUpdatePeriodFlag = &cli.DurationFlag{
+		Name:    "playback-update-period",
+		Usage:   "playback update period",
+		Value:   1 * time.Second,
+		Sources: cli.EnvVars("PLAYBACK_UPDATE_PERIOD"),
 	}
 
 	app = &cli.Command{
@@ -131,6 +138,7 @@ var (
 						Flags: []cli.Flag{
 							listenAddrFlag,
 							playbackSpeedFlag,
+							playbackUpdatePeriodFlag,
 						},
 					},
 				},

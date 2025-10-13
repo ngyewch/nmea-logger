@@ -45,7 +45,7 @@ func doAis(ctx context.Context, cmd *cli.Command) error {
 		jsonDecoder := json.NewDecoder(bytes.NewReader(logLineBytes))
 		jsonDecoder.DisallowUnknownFields()
 
-		var record Record
+		var record LoggerRecord
 		err = jsonDecoder.Decode(&record)
 		if err != nil {
 			return err

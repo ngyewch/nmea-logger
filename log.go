@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"github.com/arthurkiller/rollingwriter"
-	"github.com/urfave/cli/v3"
-	"go.bug.st/serial"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/arthurkiller/rollingwriter"
+	"github.com/urfave/cli/v3"
+	"go.bug.st/serial"
 )
 
 func doLog(ctx context.Context, cmd *cli.Command) error {
@@ -76,7 +77,7 @@ func doLog(ctx context.Context, cmd *cli.Command) error {
 		if strings.TrimSpace(scanner.Text()) == "" {
 			continue
 		}
-		record := &Record{
+		record := &LoggerRecord{
 			Timestamp: time.Now().UnixMilli(),
 			NMEA:      scanner.Text(),
 		}
@@ -97,7 +98,7 @@ func doLog(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-type Record struct {
+type LoggerRecord struct {
 	Timestamp int64  `json:"timestamp"`
 	NMEA      string `json:"nmea"`
 }

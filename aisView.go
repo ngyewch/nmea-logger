@@ -22,13 +22,39 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+type PlaybackRecord interface {
+	GetTimestamp() int64
+}
+
+type PositionReportRecord struct {
+	Type           string             `json:"type"`
+	T              int64              `json:"t"`
+	PositionReport ais.PositionReport `json:"positionReport"`
+}
+
+func (record *PositionReportRecord) GetTimestamp() int64 {
+	return record.T
+}
+
+type ShipStaticDataRecord struct {
+	Type           string             `json:"type"`
+	T              int64              `json:"t"`
+	ShipStaticData ais.ShipStaticData `json:"shipStaticData"`
+}
+
+func (record *ShipStaticDataRecord) GetTimestamp() int64 {
+	return record.T
+}
+
 func doAisView(ctx context.Context, cmd *cli.Command) error {
 	if cmd.NArg() != 1 {
 		return fmt.Errorf("insufficient arguments")
 	}
 
 	listenAddr := cmd.String(listenAddrFlag.Name)
-	playbackSpeed := cmd.Float32(playbackSpeedFlag.Name)
+	playbackSpeed := cmd.Float64(playbackSpeedFlag.Name)
+	playbackUpdatePeriod := cmd.Duration(playbackUpdatePeriodFlag.Name)
+	collectionPeriodInMs := (time.Duration(playbackUpdatePeriod.Seconds()*playbackSpeed) * time.Second).Milliseconds()
 
 	uiFs, err := fs.Sub(resources.UIFs, "gen/ui")
 	if err != nil {
@@ -48,18 +74,6 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 	_, err = os.Stat(logFile)
 	if err != nil {
 		return err
-	}
-
-	type PositionReportRecord struct {
-		Type           string             `json:"type"`
-		T              int64              `json:"t"`
-		PositionReport ais.PositionReport `json:"positionReport"`
-	}
-
-	type ShipStaticDataRecord struct {
-		Type           string             `json:"type"`
-		T              int64              `json:"t"`
-		ShipStaticData ais.ShipStaticData `json:"shipStaticData"`
 	}
 
 	httpUIFs := http.FileServer(http.FS(uiFs))
@@ -110,14 +124,14 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 		nmeaCodec := aisnmea.NMEACodecNew(aisCodec)
 
 		scanner := bufio.NewScanner(f)
-		var t int64 = 0
+		var records []PlaybackRecord
 		for scanner.Scan() {
 			logLineBytes := scanner.Bytes()
 
 			jsonDecoder := json.NewDecoder(bytes.NewReader(logLineBytes))
 			jsonDecoder.DisallowUnknownFields()
 
-			var record Record
+			var record LoggerRecord
 			err = jsonDecoder.Decode(&record)
 			if err != nil {
 				slog.Warn("error reading log line",
@@ -135,13 +149,24 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 			}
 
 			if decoded != nil {
-				if (t != 0) && (record.Timestamp > t) {
-					dt := float32(record.Timestamp-t) / playbackSpeed
-					<-time.After(time.Duration(dt) * time.Millisecond)
-					t = record.Timestamp
+				if len(records) > 0 {
+					tFirstInBatch := records[0].GetTimestamp()
+					tCurrent := record.Timestamp
+					dt := tCurrent - tFirstInBatch
+					if dt > collectionPeriodInMs {
+						err = wsjson.Write(context.Background(), c, records)
+						if err != nil {
+							slog.Warn("error writing playback records",
+								slog.Any("err", err),
+							)
+							break
+						}
+						records = nil
+						sleepDuration := time.Duration(float64(dt)*1000/playbackSpeed) * time.Microsecond
+						<-time.After(sleepDuration)
+					}
 				}
 
-				closed := false
 				switch packet := decoded.Packet.(type) {
 				case ais.PositionReport:
 					record := PositionReportRecord{
@@ -149,38 +174,25 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 						T:              record.Timestamp,
 						PositionReport: packet,
 					}
-					err = wsjson.Write(context.Background(), c, record)
-					if err != nil {
-						var closeError *websocket.CloseError
-						if errors.Is(err, closeError) {
-							closed = true
-						}
-						slog.Warn("error writing message",
-							slog.Any("err", err),
-						)
-					}
+					records = append(records, &record)
 				case ais.ShipStaticData:
 					record := ShipStaticDataRecord{
 						Type:           "shipStaticData",
 						T:              record.Timestamp,
 						ShipStaticData: packet,
 					}
-					err = wsjson.Write(context.Background(), c, record)
-					if err != nil {
-						var closeError *websocket.CloseError
-						if errors.Is(err, closeError) {
-							closed = true
-						}
-						slog.Warn("error writing message",
-							slog.Any("err", err),
-						)
-					}
-				}
-
-				if closed {
-					break
+					records = append(records, &record)
 				}
 			}
+		}
+		if len(records) > 0 {
+			err = wsjson.Write(context.Background(), c, records)
+			if err != nil {
+				slog.Warn("error writing playback records",
+					slog.Any("err", err),
+				)
+			}
+			records = nil
 		}
 
 		err = c.Close(websocket.StatusNormalClosure, "")
