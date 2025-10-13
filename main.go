@@ -92,11 +92,11 @@ var (
 		Value:   ":8080",
 		Sources: cli.EnvVars("LISTEN_ADDR"),
 	}
-	timeDilationFlag = &cli.Float32Flag{
-		Name:    "time-dilation",
-		Usage:   "time dilation",
+	playbackSpeedFlag = &cli.Float32Flag{
+		Name:    "playback-speed",
+		Usage:   "playback speed",
 		Value:   60,
-		Sources: cli.EnvVars("TIME_DILATION"),
+		Sources: cli.EnvVars("PLAYBACK_SPEED"),
 	}
 
 	app = &cli.Command{
@@ -130,7 +130,7 @@ var (
 						Action:    doAisView,
 						Flags: []cli.Flag{
 							listenAddrFlag,
-							timeDilationFlag,
+							playbackSpeedFlag,
 						},
 					},
 				},

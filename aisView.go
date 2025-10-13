@@ -28,7 +28,7 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	listenAddr := cmd.String(listenAddrFlag.Name)
-	timeDilation := cmd.Float32(timeDilationFlag.Name)
+	playbackSpeed := cmd.Float32(playbackSpeedFlag.Name)
 
 	uiFs, err := fs.Sub(resources.UIFs, "gen/ui")
 	if err != nil {
@@ -136,7 +136,7 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 
 			if decoded != nil {
 				if (t != 0) && (record.Timestamp > t) {
-					dt := float32(record.Timestamp-t) / timeDilation
+					dt := float32(record.Timestamp-t) / playbackSpeed
 					<-time.After(time.Duration(dt) * time.Millisecond)
 					t = record.Timestamp
 				}
