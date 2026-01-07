@@ -3,15 +3,19 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/bzip2"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/BertoldVdb/go-ais"
@@ -19,6 +23,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 	"github.com/ngyewch/nmea-logger/resources"
+	"github.com/ulikunitz/xz"
 	"github.com/urfave/cli/v3"
 )
 
@@ -119,11 +124,39 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 			_ = f.Close()
 		}(f)
 
+		var reader io.Reader
+		reader = f
+		if strings.HasSuffix(logFile, ".gz") {
+			gzipReader, err := gzip.NewReader(reader)
+			if err != nil {
+				slog.Warn("error opening log file",
+					slog.Any("err", err),
+				)
+				return
+			}
+			defer func(reader io.ReadCloser) {
+				_ = reader.Close()
+			}(gzipReader)
+			reader = gzipReader
+		} else if strings.HasSuffix(logFile, ".bz2") {
+			bzip2Reader := bzip2.NewReader(reader)
+			reader = bzip2Reader
+		} else if strings.HasSuffix(logFile, ".xz") {
+			xzReader, err := xz.NewReader(reader)
+			if err != nil {
+				slog.Warn("error opening log file",
+					slog.Any("err", err),
+				)
+				return
+			}
+			reader = xzReader
+		}
+
 		aisCodec := ais.CodecNew(false, false)
 		aisCodec.DropSpace = true
 		nmeaCodec := aisnmea.NMEACodecNew(aisCodec)
 
-		scanner := bufio.NewScanner(f)
+		scanner := bufio.NewScanner(reader)
 		var records []PlaybackRecord
 		for scanner.Scan() {
 			logLineBytes := scanner.Bytes()
