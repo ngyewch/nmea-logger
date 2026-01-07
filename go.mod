@@ -7,7 +7,7 @@ require (
 	github.com/arthurkiller/rollingwriter v1.1.3
 	github.com/coder/websocket v1.8.14
 	github.com/ngyewch/go-clibase v1.6.0
-	github.com/urfave/cli/v3 v3.4.1
+	github.com/urfave/cli/v3 v3.6.1
 	go.bug.st/serial v1.6.4
 )
 
