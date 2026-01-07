@@ -32,6 +32,10 @@ tasks:
       - cd ui && mise exec -- task build
       - rm -rf resources/gen/ui && mkdir -p resources/gen/ui && cp -r ui/dist/* resources/gen/ui/
 
+  docker-build:
+    cmds:
+      - docker build --tag nmea-logger:latest .
+
   dependencyUpdates:
     desc: Show dependency updates
     aliases: [ outdated ]
