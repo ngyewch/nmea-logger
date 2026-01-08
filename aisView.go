@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -238,6 +239,13 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 	http.HandleFunc("/index.html", serveIndex)
 	http.HandleFunc("/", serveIndex)
 
-	fmt.Printf("Listening on %s\n", listenAddr)
-	return http.ListenAndServe(listenAddr, nil)
+	httpListener, err := net.Listen("tcp4", listenAddr)
+	defer func(httpListener net.Listener) {
+		_ = httpListener.Close()
+	}(httpListener)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("URL: http://%s\n", httpListener.Addr().String())
+	return http.Serve(httpListener, nil)
 }

@@ -90,7 +90,7 @@ var (
 	listenAddrFlag = &cli.StringFlag{
 		Name:    "listen-addr",
 		Usage:   "listen address",
-		Value:   ":8080",
+		Value:   "127.0.0.1:8080",
 		Sources: cli.EnvVars("LISTEN_ADDR"),
 	}
 	playbackSpeedFlag = &cli.Float64Flag{
