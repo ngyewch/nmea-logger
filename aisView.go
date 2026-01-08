@@ -53,8 +53,9 @@ func (record *ShipStaticDataRecord) GetTimestamp() int64 {
 }
 
 func doAisView(ctx context.Context, cmd *cli.Command) error {
-	if cmd.NArg() != 1 {
-		return fmt.Errorf("insufficient arguments")
+	logFile := cmd.StringArg(inputFileArg.Name)
+	if logFile == "" {
+		return fmt.Errorf(inputFileArg.Name + " is required")
 	}
 
 	listenAddr := cmd.String(listenAddrFlag.Name)
@@ -76,7 +77,6 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 		return errors.New("template not found")
 	}
 
-	logFile := cmd.Args().First()
 	_, err = os.Stat(logFile)
 	if err != nil {
 		return err

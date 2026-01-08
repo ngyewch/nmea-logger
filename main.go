@@ -106,6 +106,11 @@ var (
 		Sources: cli.EnvVars("PLAYBACK_UPDATE_PERIOD"),
 	}
 
+	inputFileArg = &cli.StringArg{
+		Name:      "input-file",
+		UsageText: "(input-file)",
+	}
+
 	app = &cli.Command{
 		Name:    "nmea-logger",
 		Usage:   "NMEA logger",
@@ -125,16 +130,24 @@ var (
 				},
 			},
 			{
-				Name:      "ais",
-				Usage:     "ais",
-				ArgsUsage: "(log file)",
-				Action:    doAis,
+				Name:  "ais",
+				Usage: "ais",
 				Commands: []*cli.Command{
 					{
-						Name:      "view",
-						Usage:     "view",
-						ArgsUsage: "(log file)",
-						Action:    doAisView,
+						Name:   "convert",
+						Usage:  "convert",
+						Action: doAisConvert,
+						Arguments: []cli.Argument{
+							inputFileArg,
+						},
+					},
+					{
+						Name:   "view",
+						Usage:  "view",
+						Action: doAisView,
+						Arguments: []cli.Argument{
+							inputFileArg,
+						},
 						Flags: []cli.Flag{
 							listenAddrFlag,
 							playbackSpeedFlag,
