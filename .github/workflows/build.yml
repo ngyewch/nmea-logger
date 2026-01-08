@@ -17,7 +17,6 @@ jobs:
       - name: mise install
         uses: jdx/mise-action@v3
         with:
-          version: 2025.7.18
           install: true
           cache: true
           experimental: true
@@ -26,7 +25,6 @@ jobs:
       - name: mise install
         uses: jdx/mise-action@v3
         with:
-          version: 2025.7.18
           install: true
           cache: true
           experimental: true
