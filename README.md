@@ -37,3 +37,9 @@ Format: JSONL
 ```
 nmea-logger ais view (input-file)
 ```
+
+## AIS parser/converter
+
+```
+nmea-logger ais convert (input-file)
+```
