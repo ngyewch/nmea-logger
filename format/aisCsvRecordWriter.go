@@ -80,6 +80,7 @@ func (writer *CsvAISRecordWriter) WriteAISRecord(record *AISRecord) error {
 			strconv.FormatFloat(float64(report.Cog), 'f', -1, 64),
 			strconv.FormatFloat(float64(report.Sog), 'f', -1, 64),
 			strconv.FormatInt(int64(report.TrueHeading), 10),
+			strconv.FormatInt(int64(report.NavigationalStatus), 10),
 		)
 		shipStaticData := writer.shipStaticDataMap[report.UserID]
 		if shipStaticData != nil {
