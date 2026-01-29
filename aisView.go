@@ -1,12 +1,7 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
-	"compress/bzip2"
-	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -16,16 +11,14 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/BertoldVdb/go-ais"
-	"github.com/BertoldVdb/go-ais/aisnmea"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 	"github.com/ngyewch/nmea-logger/format"
+	"github.com/ngyewch/nmea-logger/ioutil"
 	"github.com/ngyewch/nmea-logger/resources"
-	"github.com/ulikunitz/xz"
 	"github.com/urfave/cli/v3"
 )
 
@@ -115,109 +108,66 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 			}
 		}(c)
 
-		f, err := os.Open(logFile)
+		f, err := ioutil.OpenFileForReading(logFile)
 		if err != nil {
 			slog.Warn("error opening log file",
 				slog.Any("err", err),
 			)
 			return
 		}
-		defer func(f *os.File) {
+		defer func(f io.ReadCloser) {
 			_ = f.Close()
 		}(f)
 
-		var reader io.Reader
-		reader = f
-		if strings.HasSuffix(logFile, ".gz") {
-			gzipReader, err := gzip.NewReader(reader)
-			if err != nil {
-				slog.Warn("error opening log file",
-					slog.Any("err", err),
-				)
-				return
-			}
-			defer func(reader io.ReadCloser) {
-				_ = reader.Close()
-			}(gzipReader)
-			reader = gzipReader
-		} else if strings.HasSuffix(logFile, ".bz2") {
-			bzip2Reader := bzip2.NewReader(reader)
-			reader = bzip2Reader
-		} else if strings.HasSuffix(logFile, ".xz") {
-			xzReader, err := xz.NewReader(reader)
-			if err != nil {
-				slog.Warn("error opening log file",
-					slog.Any("err", err),
-				)
-				return
-			}
-			reader = xzReader
-		}
+		loggerRecordReader := format.NewLoggerRecordReader(f)
+		aisRecordReader := format.NewAISRecordReader(loggerRecordReader, true)
 
-		aisCodec := ais.CodecNew(false, false)
-		aisCodec.DropSpace = true
-		nmeaCodec := aisnmea.NMEACodecNew(aisCodec)
-
-		scanner := bufio.NewScanner(reader)
 		var records []PlaybackRecord
-		for scanner.Scan() {
-			logLineBytes := scanner.Bytes()
-
-			jsonDecoder := json.NewDecoder(bytes.NewReader(logLineBytes))
-			jsonDecoder.DisallowUnknownFields()
-
-			var record format.LoggerRecord
-			err = jsonDecoder.Decode(&record)
+		for {
+			aisRecord, err := aisRecordReader.ReadAISRecord()
 			if err != nil {
 				slog.Warn("error reading log line",
 					slog.Any("err", err),
 				)
 				continue
 			}
-
-			decoded, err := nmeaCodec.ParseSentence(record.NMEA)
-			if err != nil {
-				slog.Warn("error parsing NMEA sentence",
-					slog.Any("err", err),
-				)
-				continue
+			if aisRecord == nil {
+				break
 			}
 
-			if decoded != nil {
-				if len(records) > 0 {
-					tFirstInBatch := records[0].GetTimestamp()
-					tCurrent := record.Timestamp
-					dt := tCurrent - tFirstInBatch
-					if dt > collectionPeriodInMs {
-						err = wsjson.Write(context.Background(), c, records)
-						if err != nil {
-							slog.Warn("error writing playback records",
-								slog.Any("err", err),
-							)
-							break
-						}
-						records = nil
-						sleepDuration := time.Duration(float64(dt)*1000/playbackSpeed) * time.Microsecond
-						<-time.After(sleepDuration)
+			if len(records) > 0 {
+				tFirstInBatch := records[0].GetTimestamp()
+				tCurrent := aisRecord.Timestamp
+				dt := tCurrent - tFirstInBatch
+				if dt > collectionPeriodInMs {
+					err = wsjson.Write(context.Background(), c, records)
+					if err != nil {
+						slog.Warn("error writing playback records",
+							slog.Any("err", err),
+						)
+						break
 					}
+					records = nil
+					sleepDuration := time.Duration(float64(dt)*1000/playbackSpeed) * time.Microsecond
+					<-time.After(sleepDuration)
 				}
+			}
 
-				switch packet := decoded.Packet.(type) {
-				case ais.PositionReport:
-					record := PositionReportRecord{
-						Type:           "positionReport",
-						T:              record.Timestamp,
-						PositionReport: packet,
-					}
-					records = append(records, &record)
-				case ais.ShipStaticData:
-					record := ShipStaticDataRecord{
-						Type:           "shipStaticData",
-						T:              record.Timestamp,
-						ShipStaticData: packet,
-					}
-					records = append(records, &record)
+			switch packet := aisRecord.AIS.Packet.(type) {
+			case ais.PositionReport:
+				record := PositionReportRecord{
+					Type:           "positionReport",
+					T:              aisRecord.Timestamp,
+					PositionReport: packet,
 				}
+				records = append(records, &record)
+			case ais.ShipStaticData:
+				record := ShipStaticDataRecord{
+					Type:           "shipStaticData",
+					T:              aisRecord.Timestamp,
+					ShipStaticData: packet,
+				}
+				records = append(records, &record)
 			}
 		}
 		if len(records) > 0 {
