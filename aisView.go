@@ -23,6 +23,7 @@ import (
 	"github.com/BertoldVdb/go-ais/aisnmea"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+	"github.com/ngyewch/nmea-logger/format"
 	"github.com/ngyewch/nmea-logger/resources"
 	"github.com/ulikunitz/xz"
 	"github.com/urfave/cli/v3"
@@ -165,7 +166,7 @@ func doAisView(ctx context.Context, cmd *cli.Command) error {
 			jsonDecoder := json.NewDecoder(bytes.NewReader(logLineBytes))
 			jsonDecoder.DisallowUnknownFields()
 
-			var record LoggerRecord
+			var record format.LoggerRecord
 			err = jsonDecoder.Decode(&record)
 			if err != nil {
 				slog.Warn("error reading log line",

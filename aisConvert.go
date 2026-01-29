@@ -1,113 +1,116 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
-	"compress/bzip2"
-	"compress/gzip"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"strings"
+	"path/filepath"
 
-	"github.com/BertoldVdb/go-ais"
-	"github.com/BertoldVdb/go-ais/aisnmea"
-	"github.com/ulikunitz/xz"
+	"github.com/ngyewch/nmea-logger/format"
+	"github.com/ngyewch/nmea-logger/ioutil"
 	"github.com/urfave/cli/v3"
 )
 
-const (
-	ignoreParseErrors = true
-)
+type RecordPreprocessor interface {
+	PreprocessRecord(record *format.AISRecord) error
+}
 
 func doAisConvert(ctx context.Context, cmd *cli.Command) error {
-	logFile := cmd.StringArg(inputFileArg.Name)
-	if logFile == "" {
+	inputFile := cmd.StringArg(inputFileArg.Name)
+	outputFile := cmd.StringArg(outputFileArg.Name)
+	if inputFile == "" {
 		return fmt.Errorf(inputFileArg.Name + " is required")
 	}
 
-	f, err := os.Open(logFile)
-	if err != nil {
-		return err
-	}
-	defer func(f *os.File) {
-		_ = f.Close()
-	}(f)
+	var recordWriter format.AISRecordWriter
 
-	var reader io.Reader
-	reader = f
-	if strings.HasSuffix(logFile, ".gz") {
-		gzipReader, err := gzip.NewReader(reader)
+	if outputFile != "" {
+		f, outputFile1, err := ioutil.OpenFileForWriting(outputFile)
+		if err != nil {
+			return err
+		}
+		defer func(f io.WriteCloser) {
+			_ = f.Close()
+		}(f)
+
+		ext := filepath.Ext(outputFile1)
+		switch ext {
+		case ".jsonl":
+			recordWriter = format.NewJsonlAISRecordWriter(f)
+			defer func(recordWriter format.AISRecordWriter) {
+				_ = recordWriter.Close()
+			}(recordWriter)
+
+		case ".csv":
+			recordWriter, err = format.NewCsvAISRecordWriter(f)
+			if err != nil {
+				return err
+			}
+			defer func(recordWriter format.AISRecordWriter) {
+				_ = recordWriter.Close()
+			}(recordWriter)
+
+		default:
+			return fmt.Errorf("unsupported file extension")
+		}
+	} else {
+		recordWriter = format.NewJsonlAISRecordWriter(os.Stdout)
+		defer func(recordWriter format.AISRecordWriter) {
+			_ = recordWriter.Close()
+		}(recordWriter)
+	}
+
+	const ignoreParseErrors = true
+
+	recordPreprocessor, ok := recordWriter.(RecordPreprocessor)
+	if ok {
+		reader, err := ioutil.OpenFileForReading(inputFile)
 		if err != nil {
 			return err
 		}
 		defer func(reader io.ReadCloser) {
 			_ = reader.Close()
-		}(gzipReader)
-		reader = gzipReader
-	} else if strings.HasSuffix(logFile, ".bz2") {
-		bzip2Reader := bzip2.NewReader(reader)
-		reader = bzip2Reader
-	} else if strings.HasSuffix(logFile, ".xz") {
-		xzReader, err := xz.NewReader(reader)
-		if err != nil {
-			return err
+		}(reader)
+		loggerRecordReader := format.NewLoggerRecordReader(reader)
+		aisRecordReader := format.NewAISRecordReader(loggerRecordReader, ignoreParseErrors)
+		for {
+			aisRecord, err := aisRecordReader.ReadAISRecord()
+			if err != nil {
+				return err
+			}
+			if aisRecord == nil {
+				break
+			}
+			err = recordPreprocessor.PreprocessRecord(aisRecord)
+			if err != nil {
+				return err
+			}
 		}
-		reader = xzReader
 	}
 
-	aisCodec := ais.CodecNew(false, false)
-	aisCodec.DropSpace = true
-	nmeaCodec := aisnmea.NMEACodecNew(aisCodec)
-
-	w := os.Stdout
-
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		logLineBytes := scanner.Bytes()
-
-		jsonDecoder := json.NewDecoder(bytes.NewReader(logLineBytes))
-		jsonDecoder.DisallowUnknownFields()
-
-		var record LoggerRecord
-		err = jsonDecoder.Decode(&record)
+	reader, err := ioutil.OpenFileForReading(inputFile)
+	if err != nil {
+		return err
+	}
+	defer func(reader io.ReadCloser) {
+		_ = reader.Close()
+	}(reader)
+	loggerRecordReader := format.NewLoggerRecordReader(reader)
+	aisRecordReader := format.NewAISRecordReader(loggerRecordReader, ignoreParseErrors)
+	for {
+		aisRecord, err := aisRecordReader.ReadAISRecord()
 		if err != nil {
 			return err
 		}
-
-		decoded, err := nmeaCodec.ParseSentence(record.NMEA)
-		if err != nil {
-			if !ignoreParseErrors {
-				return err
-			}
+		if aisRecord == nil {
+			break
 		}
-
-		if decoded != nil {
-			record := &AISRecord{
-				Timestamp: record.Timestamp,
-				AIS:       decoded,
-			}
-			jsonBytes, err := json.Marshal(record)
-			if err != nil {
-				return err
-			}
-			_, err = w.Write(jsonBytes)
-			if err != nil {
-				return err
-			}
-			_, err = w.Write([]byte{'\n'})
-			if err != nil {
-				return err
-			}
+		err = recordWriter.WriteAISRecord(aisRecord)
+		if err != nil {
+			return err
 		}
 	}
 
 	return nil
-}
-
-type AISRecord struct {
-	Timestamp int64              `json:"timestamp"`
-	AIS       *aisnmea.VdmPacket `json:"ais"`
 }

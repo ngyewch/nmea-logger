@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/arthurkiller/rollingwriter"
+	"github.com/ngyewch/nmea-logger/format"
 	"github.com/urfave/cli/v3"
 	"go.bug.st/serial"
 )
@@ -77,7 +78,7 @@ func doLog(ctx context.Context, cmd *cli.Command) error {
 		if strings.TrimSpace(scanner.Text()) == "" {
 			continue
 		}
-		record := &LoggerRecord{
+		record := &format.LoggerRecord{
 			Timestamp: time.Now().UnixMilli(),
 			NMEA:      scanner.Text(),
 		}
@@ -96,9 +97,4 @@ func doLog(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	return nil
-}
-
-type LoggerRecord struct {
-	Timestamp int64  `json:"timestamp"`
-	NMEA      string `json:"nmea"`
 }

@@ -110,6 +110,10 @@ var (
 		Name:      "input-file",
 		UsageText: "(input-file)",
 	}
+	outputFileArg = &cli.StringArg{
+		Name:      "output-file",
+		UsageText: "(output-file)",
+	}
 
 	app = &cli.Command{
 		Name:    "nmea-logger",
@@ -139,6 +143,7 @@ var (
 						Action: doAisConvert,
 						Arguments: []cli.Argument{
 							inputFileArg,
+							outputFileArg,
 						},
 					},
 					{
