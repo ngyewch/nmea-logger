@@ -54,7 +54,7 @@ func NewCsvAISRecordWriter(w io.Writer, customizer CsvCustomizer) (*CsvAISRecord
 	if customizer != nil {
 		extraCsvHeaders := customizer.ExtraHeaders()
 		if extraCsvHeaders != nil {
-			extraCsvHeaders = append(newCsvHeaders, extraCsvHeaders...)
+			newCsvHeaders = append(newCsvHeaders, extraCsvHeaders...)
 		}
 	}
 	err := csvWriter.Write(newCsvHeaders)
