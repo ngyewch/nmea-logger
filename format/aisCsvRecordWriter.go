@@ -88,7 +88,7 @@ func (writer *CsvAISRecordWriter) WriteAISRecord(record *AISRecord) error {
 	const dateTimeLayout = "2006-01-02 15:04:05"
 	switch report := record.AIS.Packet.(type) {
 	case ais.PositionReport:
-		t := time.UnixMilli(record.Timestamp)
+		t := time.UnixMilli(record.Timestamp).In(time.UTC)
 		var cells []string
 		cells = append(cells,
 			t.Format(dateTimeLayout),
