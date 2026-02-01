@@ -11,14 +11,8 @@ import (
 	"github.com/BertoldVdb/go-ais"
 )
 
-type CsvAISRecordWriter struct {
-	csvWriter         *csv.Writer
-	shipStaticDataMap map[uint32]*ais.ShipStaticData
-}
-
-func NewCsvAISRecordWriter(w io.Writer) (*CsvAISRecordWriter, error) {
-	csvWriter := csv.NewWriter(w)
-	err := csvWriter.Write([]string{
+var (
+	csvHeaders = []string{
 		"DATE TIME (UTC)",
 		"EPOCH TIME",
 		"MMSI",
@@ -39,11 +33,36 @@ func NewCsvAISRecordWriter(w io.Writer) (*CsvAISRecordWriter, error) {
 		"DRAUGHT",
 		"DESTINATION",
 		"ETA",
-	})
+	}
+)
+
+type CsvCustomizer interface {
+	ExtraHeaders() []string
+	GetExtraCells(record *AISRecord) []string
+}
+
+type CsvAISRecordWriter struct {
+	customizer        CsvCustomizer
+	csvWriter         *csv.Writer
+	shipStaticDataMap map[uint32]*ais.ShipStaticData
+}
+
+func NewCsvAISRecordWriter(w io.Writer, customizer CsvCustomizer) (*CsvAISRecordWriter, error) {
+	csvWriter := csv.NewWriter(w)
+	var newCsvHeaders []string
+	newCsvHeaders = append(newCsvHeaders, csvHeaders...)
+	if customizer != nil {
+		extraCsvHeaders := customizer.ExtraHeaders()
+		if extraCsvHeaders != nil {
+			extraCsvHeaders = append(newCsvHeaders, extraCsvHeaders...)
+		}
+	}
+	err := csvWriter.Write(newCsvHeaders)
 	if err != nil {
 		return nil, err
 	}
 	return &CsvAISRecordWriter{
+		customizer:        customizer,
 		csvWriter:         csvWriter,
 		shipStaticDataMap: make(map[uint32]*ais.ShipStaticData),
 	}, nil
@@ -97,6 +116,13 @@ func (writer *CsvAISRecordWriter) WriteAISRecord(record *AISRecord) error {
 				shipStaticData.Destination,
 				fmt.Sprintf("%02d-%02d %02d:%02d", shipStaticData.Eta.Month, shipStaticData.Eta.Day, shipStaticData.Eta.Hour, shipStaticData.Eta.Minute),
 			)
+		}
+
+		if writer.customizer != nil {
+			extraCells := writer.customizer.GetExtraCells(record)
+			if extraCells != nil {
+				cells = append(cells, extraCells...)
+			}
 		}
 
 		err := writer.csvWriter.Write(cells)

@@ -43,7 +43,7 @@ func doAisConvert(ctx context.Context, cmd *cli.Command) error {
 			}(recordWriter)
 
 		case ".csv":
-			recordWriter, err = format.NewCsvAISRecordWriter(f)
+			recordWriter, err = format.NewCsvAISRecordWriter(f, nil)
 			if err != nil {
 				return err
 			}
